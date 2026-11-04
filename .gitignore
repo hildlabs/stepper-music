@@ -1,0 +1,25 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Runtime data of the dashboard (uploaded MIDI files and generated headers)
+dashboard/midi_library/
+dashboard/out/
+
+# Local environment
+.env
+*.env
+
+# Backups and editor files
+*.bak.*
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Internal working files
+.claude/
+CLAUDE.md
+.mcp.json

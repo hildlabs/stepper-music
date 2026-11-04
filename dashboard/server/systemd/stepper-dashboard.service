@@ -1,0 +1,16 @@
+[Unit]
+Description=Stepper Dashboard (Pi UI + library)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/stepper-music/dashboard
+Environment=STEPPER_DASHBOARD_PORT=8788
+Environment=STEPPER_BRIDGE_URL=http://<pc-ip>:8766
+Environment=LED_BRIDGE_URL=http://<pc-ip>:8765
+ExecStart=%h/stepper-music/dashboard/.venv/bin/python %h/stepper-music/dashboard/server/server.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target

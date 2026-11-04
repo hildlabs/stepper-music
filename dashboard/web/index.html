@@ -1,0 +1,1480 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Stepper Lab · MIDI → 4-voice</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800&family=Caveat:wght@500&display=swap" rel="stylesheet">
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          cream:    '#fef6e1',
+          cream2:   '#fdecc8',
+          paper:    '#ffffff',
+          ink:      '#2d3a3c',
+          inkSoft:  '#5c6d6e',
+          inkMute:  '#8e9a9a',
+          leaf:     '#84cf7f',
+          leafDeep: '#4fa353',
+          leafMist: '#daf2d5',
+          peach:    '#ffae89',
+          peachDeep:'#e47b5a',
+          peachMist:'#ffe1d1',
+          sky:      '#9dd5ec',
+          skyDeep:  '#3f95bd',
+          skyMist:  '#d8eef8',
+          sun:      '#ffd56b',
+          sunDeep:  '#e2a72b',
+          rose:     '#ff8da3',
+          roseDeep: '#e85e7c',
+          roseMist: '#ffd9e2',
+        },
+        fontFamily: {
+          display: ['"Fredoka"', 'ui-rounded', 'system-ui'],
+          body:    ['"Nunito"', 'ui-rounded', 'system-ui'],
+          hand:    ['"Caveat"', 'cursive'],
+        },
+        boxShadow: {
+          soft:  '0 2px 0 #e7d7ad, 0 6px 20px -8px rgba(164,130,60,0.25)',
+          softHover: '0 3px 0 #e7d7ad, 0 14px 28px -10px rgba(164,130,60,0.35)',
+          deep:  '0 4px 0 #e7d7ad, 0 20px 40px -12px rgba(164,130,60,0.35)',
+          inset: 'inset 0 2px 0 rgba(255,255,255,0.8), inset 0 -2px 0 rgba(0,0,0,0.04)',
+        },
+      }
+    }
+  }
+</script>
+
+<style>
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: 'Nunito', ui-rounded, system-ui;
+    color: #2d3a3c;
+    background:
+      radial-gradient(ellipse 60% 45% at 20% 10%, #ffe9c1 0%, transparent 60%),
+      radial-gradient(ellipse 50% 40% at 85% 20%, #d8eef8 0%, transparent 60%),
+      radial-gradient(ellipse 60% 50% at 85% 90%, #fde1ea 0%, transparent 60%),
+      radial-gradient(ellipse 40% 30% at 15% 95%, #e4f5dc 0%, transparent 60%),
+      #fef6e1;
+    font-weight: 600;
+  }
+
+  /* Decorative fluffy clouds sitting in the background */
+  .cloud {
+    position: absolute; border-radius: 999px; background: #ffffff;
+    filter: blur(0.5px);
+    box-shadow:
+      0 8px 24px -8px rgba(120,100,70,0.18),
+      inset 0 -6px 0 #f6eccf;
+    pointer-events: none; opacity: 0.9;
+  }
+
+  /* Panel base */
+  .panel {
+    background: #ffffff;
+    border-radius: 28px;
+    border: 2px solid #f0dfb0;
+    box-shadow:
+      0 2px 0 #e7d7ad,
+      0 18px 30px -18px rgba(164,130,60,0.25);
+    position: relative;
+  }
+  .panel-tinted-leaf  { background: linear-gradient(180deg,#f5fbf0 0%,#ffffff 100%); }
+  .panel-tinted-sky   { background: linear-gradient(180deg,#eff8fd 0%,#ffffff 100%); }
+  .panel-tinted-peach { background: linear-gradient(180deg,#fff4ed 0%,#ffffff 100%); }
+
+  /* Chips / pills */
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+  .chip-leaf  { background:#daf2d5; color:#4fa353; }
+  .chip-peach { background:#ffe1d1; color:#e47b5a; }
+  .chip-sky   { background:#d8eef8; color:#3f95bd; }
+  .chip-plum  { background:#e8dbf5; color:#8e6fc5; }
+  .chip-sun   { background:#fff2cc; color:#e2a72b; }
+  .chip-rose  { background:#ffd9e2; color:#e85e7c; }
+  .chip-ink   { background:#ecf0f0; color:#5c6d6e; }
+
+  /* Buttons — chunky AC-style */
+  .btn {
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 10px 18px;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #2d3a3c;
+    border: 2px solid #e6d59a;
+    box-shadow: 0 3px 0 #e7d7ad;
+    cursor: pointer;
+    transition: transform 120ms cubic-bezier(.2,.8,.2,1), box-shadow 120ms ease, background 120ms ease;
+  }
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 0 #e7d7ad; }
+  .btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #e7d7ad; }
+  .btn[disabled] { opacity: 0.4; pointer-events: none; }
+
+  .btn-leaf  { background:#84cf7f; border-color:#4fa353; color:#224c25; box-shadow: 0 3px 0 #4fa353; }
+  .btn-leaf:hover { box-shadow: 0 4px 0 #4fa353; }
+  .btn-leaf:active { box-shadow: 0 1px 0 #4fa353; }
+  .btn-sky   { background:#9dd5ec; border-color:#3f95bd; color:#0e3c53; box-shadow: 0 3px 0 #3f95bd; }
+  .btn-rose  { background:#ff8da3; border-color:#e85e7c; color:#5a1f31; box-shadow: 0 3px 0 #e85e7c; }
+  .btn-rose:hover { box-shadow: 0 4px 0 #e85e7c; }
+  .btn-rose:active { box-shadow: 0 1px 0 #e85e7c; }
+  .btn-ghost { background:#fff; border-color:#e0e6e6; color:#5c6d6e; box-shadow: 0 3px 0 #dbe2e2; }
+  .btn-ghost:hover { box-shadow: 0 4px 0 #dbe2e2; }
+
+  /* Big STOP button */
+  .btn-stop {
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 700;
+    font-size: 20px;
+    letter-spacing: 0.01em;
+    padding: 14px 28px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #ff9fb5 0%, #ff8da3 100%);
+    color: #5a1f31;
+    border: 3px solid #e85e7c;
+    box-shadow: 0 5px 0 #e85e7c, 0 14px 30px -12px rgba(232,94,124,0.55);
+    cursor: pointer;
+    transition: all 140ms cubic-bezier(.2,.8,.2,1);
+    display: inline-flex; align-items: center; gap: 10px;
+  }
+  .btn-stop:hover { transform: translateY(-2px); box-shadow: 0 7px 0 #e85e7c, 0 18px 34px -12px rgba(232,94,124,0.6); }
+  .btn-stop:active { transform: translateY(3px); box-shadow: 0 2px 0 #e85e7c; }
+  .btn-stop[disabled] { opacity: 0.35; pointer-events: none; filter: grayscale(0.3); }
+
+  /* Voice readout tiles */
+  .vtile {
+    border-radius: 22px; padding: 14px 16px;
+    border: 2px solid; position: relative;
+    background: #ffffff;
+    box-shadow: 0 2px 0, 0 8px 16px -10px rgba(0,0,0,0.1);
+  }
+  .vtile-1 { border-color:#b7e5b2; box-shadow: 0 2px 0 #b7e5b2, 0 8px 16px -10px rgba(79,163,83,0.25); }
+  .vtile-2 { border-color:#ffc9b1; box-shadow: 0 2px 0 #ffc9b1, 0 8px 16px -10px rgba(228,123,90,0.25); }
+  .vtile-3 { border-color:#bde2f2; box-shadow: 0 2px 0 #bde2f2, 0 8px 16px -10px rgba(63,149,189,0.25); }
+  .vtile-4 { border-color:#d9c4ef; box-shadow: 0 2px 0 #d9c4ef, 0 8px 16px -10px rgba(142,111,197,0.25); }
+
+  .vtile .note {
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 600;
+    font-size: 44px;
+    line-height: 1;
+    letter-spacing: -0.01em;
+  }
+  .vtile-1 .note { color:#4fa353; }
+  .vtile-2 .note { color:#e47b5a; }
+  .vtile-3 .note { color:#3f95bd; }
+  .vtile-4 .note { color:#8e6fc5; }
+
+  /* Little dot indicator */
+  .dot {
+    width: 10px; height: 10px; border-radius: 999px;
+    display: inline-block; flex: none;
+    background: #e0e6e6;
+    box-shadow: inset 0 -2px 0 rgba(0,0,0,0.08);
+    transition: all 120ms ease;
+  }
+  .dot.on-leaf  { background:#84cf7f; box-shadow: 0 0 10px #84cf7f, inset 0 -2px 0 rgba(0,0,0,0.1); }
+  .dot.on-peach { background:#ffae89; box-shadow: 0 0 10px #ffae89, inset 0 -2px 0 rgba(0,0,0,0.1); }
+  .dot.on-sky   { background:#9dd5ec; box-shadow: 0 0 10px #9dd5ec, inset 0 -2px 0 rgba(0,0,0,0.1); }
+  .dot.on-plum  { background:#bd9ae4; box-shadow: 0 0 10px #bd9ae4, inset 0 -2px 0 rgba(0,0,0,0.1); }
+  .dot.pulse    { animation: pulseDot 1s ease-in-out infinite; }
+  @keyframes pulseDot { 50% { transform: scale(1.35); } }
+
+  /* Drop zone */
+  .drop {
+    border: 2.5px dashed #e6d59a;
+    border-radius: 24px;
+    background: linear-gradient(180deg, #fff9e6 0%, #fffbf0 100%);
+    transition: all 180ms cubic-bezier(.2,.8,.2,1);
+    cursor: pointer;
+  }
+  .drop:hover { border-color:#d9c274; background: linear-gradient(180deg, #fff3c4 0%, #fff8dd 100%); }
+  .drop.drag {
+    border-style: solid; border-color:#84cf7f;
+    background: #ecf9e7; transform: translateY(-2px);
+    box-shadow: 0 8px 24px -10px rgba(79,163,83,0.4);
+  }
+
+  /* Progress bar */
+  .progress-track {
+    height: 12px; border-radius: 999px;
+    background: #f3e9c8;
+    box-shadow: inset 0 2px 0 rgba(0,0,0,0.06);
+    overflow: hidden; position: relative;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #84cf7f 0%, #a8e39e 50%, #84cf7f 100%);
+    background-size: 200% 100%;
+    border-radius: 999px;
+    transition: width 80ms linear;
+    animation: stripes 3s linear infinite;
+    box-shadow: inset 0 -2px 0 rgba(0,0,0,0.08), inset 0 2px 0 rgba(255,255,255,0.5);
+  }
+  @keyframes stripes { to { background-position: 200% 0; } }
+
+  /* Scope */
+  .scope-wrap {
+    border-radius: 24px; padding: 14px 16px 18px;
+    background:
+      radial-gradient(ellipse 60% 80% at 50% 100%, rgba(157,213,236,0.18) 0%, transparent 70%),
+      linear-gradient(180deg, #fbfef8 0%, #f6fbf3 100%);
+    border: 2px solid #e3efdd;
+    position: relative; overflow: hidden;
+    box-shadow: inset 0 2px 0 rgba(255,255,255,0.8);
+  }
+  .scope-wrap svg { user-select: none; -webkit-user-select: none; cursor: grab; }
+  .scope-wrap svg:active { cursor: grabbing; }
+  .scope-wrap.dragging, .scope-wrap.dragging * { user-select: none !important; }
+
+  .tick-text { font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 10px; fill:#a39c72; }
+  .grid-line { stroke: #eee3b8; stroke-width: 1; }
+  .grid-line-strong { stroke: #d9c98a; stroke-width: 1; }
+
+  /* Playhead — solid warm line with glow */
+  .playhead-line {
+    stroke: #e85e7c; stroke-width: 2.5;
+    filter: drop-shadow(0 0 6px rgba(232,94,124,0.8)) drop-shadow(0 0 2px rgba(232,94,124,1));
+  }
+  .playhead-head { fill:#e85e7c; }
+
+  /* Card */
+  .card {
+    background:#fff; border-radius: 22px;
+    border: 2px solid #f0e3b8;
+    box-shadow: 0 2px 0 #ead8a5, 0 10px 20px -14px rgba(164,130,60,0.3);
+    padding: 14px 16px;
+    transition: transform 160ms cubic-bezier(.2,.8,.2,1), box-shadow 160ms ease;
+  }
+  .card:hover { transform: translateY(-2px); box-shadow: 0 4px 0 #ead8a5, 0 18px 26px -14px rgba(164,130,60,0.4); }
+  .card.playing {
+    border-color: #84cf7f;
+    box-shadow: 0 4px 0 #4fa353, 0 14px 30px -14px rgba(79,163,83,0.45);
+  }
+
+  /* Search */
+  .search-wrap {
+    position: relative; display: flex; align-items: center;
+    background: #fbf5e0;
+    border: 2px solid #f0e3b8;
+    border-radius: 999px;
+    padding: 6px 14px 6px 12px;
+    transition: all 140ms ease;
+  }
+  .search-wrap:focus-within {
+    border-color: #84cf7f; background: #ffffff;
+    box-shadow: 0 0 0 4px rgba(132,207,127,0.2);
+  }
+  .search-icon { font-size: 14px; margin-right: 8px; opacity: 0.7; }
+  .search-wrap input {
+    background: transparent; outline: none; border: none; flex: 1;
+    font-family: 'Nunito', sans-serif; font-weight: 600;
+    font-size: 14px; color: #2d3a3c; min-width: 0;
+  }
+  .search-wrap input::placeholder { color: #b9b491; font-weight: 600; }
+  #search-clear {
+    border: none; background: #f0e3b8; color: #5c6d6e;
+    width: 22px; height: 22px; border-radius: 999px;
+    font-size: 16px; line-height: 1; cursor: pointer;
+    display: none; flex: none;
+  }
+  .search-wrap.has-text #search-clear { display: inline-flex; align-items:center; justify-content:center; }
+
+  /* Library scroll body */
+  .lib-body { scrollbar-width: thin; scrollbar-color: #e6d59a transparent; }
+  .lib-body::-webkit-scrollbar { width: 10px; }
+  .lib-body::-webkit-scrollbar-thumb { background: #e6d59a; border-radius: 999px; border: 2px solid transparent; background-clip: content-box; }
+  .lib-body::-webkit-scrollbar-track { background: transparent; }
+
+  /* Toast */
+  .toast {
+    position: fixed; right: 24px; bottom: 24px;
+    min-width: 300px; max-width: 440px; z-index: 50;
+    animation: toastIn 260ms cubic-bezier(.2,.9,.2,1);
+  }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(14px); } }
+  .toast-inner {
+    background: #ffffff;
+    border: 2px solid #f0dfb0;
+    border-radius: 20px;
+    padding: 14px 18px;
+    box-shadow: 0 4px 0 #e7d7ad, 0 18px 40px -12px rgba(164,130,60,0.35);
+  }
+
+  /* Roll note animation */
+  .roll-note { transition: opacity 80ms ease; }
+  .roll-note.active { filter: drop-shadow(0 0 6px currentColor); }
+
+
+  /* Bouncy enter */
+  .enter { opacity: 0; transform: translateY(8px) scale(0.98); animation: enter 320ms cubic-bezier(.2,.9,.3,1.1) forwards; }
+  @keyframes enter { to { opacity: 1; transform: none; } }
+
+  /* Subtle wave bob for the brand icon */
+  .wobble { animation: wobble 4.5s ease-in-out infinite; display: inline-block; }
+  @keyframes wobble { 0%,100% { transform: rotate(-3deg); } 50% { transform: rotate(5deg); } }
+
+  /* Big title */
+  .song-title {
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: #2d3a3c;
+  }
+
+  /* Label helpers */
+  .label {
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 500;
+    font-size: 12px;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: #8e9a9a;
+  }
+
+  /* Readable tabular stats */
+  .stat-val {
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 600;
+    font-size: 17px;
+    color: #2d3a3c;
+    line-height: 1;
+  }
+
+</style>
+</head>
+<body>
+
+<!-- Decorative clouds in the background -->
+<div class="cloud" style="width:140px; height:80px; top:8%;   left:4%;  opacity:0.7;"></div>
+<div class="cloud" style="width:200px; height:110px;top:60%;  left:38%; opacity:0.45;"></div>
+<div class="cloud" style="width:180px; height:100px;top:4%;   right:8%; opacity:0.55;"></div>
+<div class="cloud" style="width:120px; height:70px; bottom:8%;right:28%;opacity:0.5;"></div>
+
+<!-- =========================================================== -->
+<!-- App root: locks the viewport, inner library is the only thing that scrolls -->
+<!-- =========================================================== -->
+<div class="relative h-screen flex flex-col px-6 py-5 gap-5">
+
+  <!-- ======================== HEADER ======================== -->
+  <header class="flex items-center gap-4 flex-none">
+    <div class="flex items-center gap-3">
+      <div class="wobble text-4xl">🎹</div>
+      <div>
+        <div class="font-display font-700 text-[26px] leading-none tracking-tight text-ink">stepper lab</div>
+        <div class="font-hand text-[17px] text-inkMute leading-none -mt-0.5">midi → 4 voices</div>
+      </div>
+    </div>
+
+    <div class="flex-1"></div>
+
+    <div class="hidden md:flex items-center gap-2">
+      <span class="chip chip-leaf">  <span class="dot on-leaf"></span> melody </span>
+      <span class="chip chip-peach"> <span class="dot on-peach"></span> bass   </span>
+      <span class="chip chip-sky">   <span class="dot on-sky"></span> harm ↑</span>
+      <span class="chip chip-plum">  <span class="dot on-plum"></span> harm ↓</span>
+    </div>
+
+    <div class="flex items-center gap-2 ml-4">
+      <button id="led-sync-btn" class="chip chip-ink" type="button"
+              style="cursor:pointer; border:none; transition: opacity 0.2s;">
+        <span id="led-sync-emoji">💡</span>
+        <span id="led-sync-label">led sync</span>
+        <span id="led-sync-suffix" class="text-inkMute" style="display:none; font-weight:600;"></span>
+        <span id="led-sync-dots" class="ml-1" style="display:none; gap:3px;">
+          <span style="display:inline-block;width:7px;height:7px;border-radius:9999px;background:#ff1414"></span>
+          <span style="display:inline-block;width:7px;height:7px;border-radius:9999px;background:#ff1414"></span>
+          <span style="display:inline-block;width:7px;height:7px;border-radius:9999px;background:#ff1414"></span>
+          <span style="display:inline-block;width:7px;height:7px;border-radius:9999px;background:#ff1414"></span>
+        </span>
+      </button>
+      <div id="led-offset-chip" class="chip chip-sky" style="display:none"
+           title="LED sync offset — raise if panels start before the music">
+        offset
+        <button id="led-offset-minus" type="button"
+                style="border:none;background:none;cursor:pointer;color:#3f95bd;font-weight:700">−</button>
+        <span id="led-offset-val" class="tabular-nums">1500</span>ms
+        <button id="led-offset-plus" type="button"
+                style="border:none;background:none;cursor:pointer;color:#3f95bd;font-weight:700">+</button>
+      </div>
+      <button id="led-renderer-chip" class="chip chip-leaf" type="button"
+              style="display:none; cursor:pointer; border:none"
+              title="LED render style — click to cycle: pulsewall / wave / reactive">
+        style:&nbsp;<span id="led-renderer-val">pulsewall</span>
+      </button>
+      <button id="effect-btn" class="chip chip-peach" type="button"
+              title="cycle through LED effects (shift+click to turn off)"
+              style="cursor:pointer; border:none; transition: opacity 0.2s;">
+        <span id="effect-emoji">🎬</span>
+        <span id="effect-label">effect: off</span>
+      </button>
+      <button id="motor-test-btn" class="chip chip-rose" type="button"
+              title="flash & run: each motor spins briefly in sequence"
+              style="cursor:pointer; border:none">🔧 motor test</button>
+      <span class="chip chip-ink">🔌 /dev/ttyUSB1</span>
+      <span id="clock" class="chip chip-sun">🕒 --:--</span>
+    </div>
+  </header>
+
+  <!-- ======================== MAIN ROW ======================== -->
+  <main class="flex-1 grid grid-cols-12 gap-5 min-h-0">
+
+    <!-- LEFT: Now playing (big) -->
+    <section class="col-span-12 lg:col-span-8 panel p-5 flex flex-col gap-4 min-h-0 relative overflow-hidden">
+      <!-- Title row -->
+      <div class="flex items-start gap-4 flex-none">
+        <div class="min-w-0 flex-1">
+          <div class="label mb-1">now playing</div>
+          <div id="now-title" class="song-title text-[34px] leading-[1.05] truncate">
+            <span class="text-inkMute">— nothing loaded —</span>
+          </div>
+          <div id="now-sub" class="text-inkSoft text-[14px] mt-1">pick a song from the library and hit <span class="chip chip-leaf">▶ flash &amp; play</span></div>
+        </div>
+        <button id="stop-btn" class="btn-stop flex-none" disabled>
+          <span>◼</span> stop
+        </button>
+      </div>
+
+      <!-- Voice readouts -->
+      <div class="grid grid-cols-4 gap-4 flex-none">
+        <div class="vtile vtile-1">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="dot" data-voice-dot="1"></span>
+            <span class="label" style="color:#4fa353">voice 01 · melody</span>
+          </div>
+          <div class="note" data-voice-note="1">—</div>
+          <div class="text-inkMute text-[13px] mt-1" data-voice-hz="1">0.0 hz</div>
+        </div>
+        <div class="vtile vtile-2">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="dot" data-voice-dot="2"></span>
+            <span class="label" style="color:#e47b5a">voice 02 · bass</span>
+          </div>
+          <div class="note" data-voice-note="2">—</div>
+          <div class="text-inkMute text-[13px] mt-1" data-voice-hz="2">0.0 hz</div>
+        </div>
+        <div class="vtile vtile-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="dot" data-voice-dot="3"></span>
+            <span class="label" style="color:#3f95bd">voice 03 · harm ↑</span>
+          </div>
+          <div class="note" data-voice-note="3">—</div>
+          <div class="text-inkMute text-[13px] mt-1" data-voice-hz="3">0.0 hz</div>
+        </div>
+        <div class="vtile vtile-4">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="dot" data-voice-dot="4"></span>
+            <span class="label" style="color:#8e6fc5">voice 04 · harm ↓</span>
+          </div>
+          <div class="note" data-voice-note="4">—</div>
+          <div class="text-inkMute text-[13px] mt-1" data-voice-hz="4">0.0 hz</div>
+        </div>
+      </div>
+
+      <!-- Scope (piano roll) - fills remaining space -->
+      <div class="flex-1 scope-wrap min-h-0 flex flex-col gap-2">
+        <div class="flex items-center justify-between flex-none gap-2">
+          <span class="label" style="color:#6b7a5a">🎹 song roll · 4 voices overlay</span>
+          <span class="flex-1"></span>
+          <div class="chip chip-sky" title="sync offset — increase if simulation lags behind arduino">
+            sync
+            <button id="sync-minus" style="border:none;background:none;cursor:pointer;color:#3f95bd;font-weight:700">−</button>
+            <span id="sync-val" class="tabular-nums">1000</span>ms
+            <button id="sync-plus" style="border:none;background:none;cursor:pointer;color:#3f95bd;font-weight:700">+</button>
+          </div>
+          <button id="zoom-reset" class="chip chip-ink" title="fit song to view (press 0)" style="cursor:pointer; border:none">⤢ fit</button>
+          <div class="flex items-center gap-2 text-[13px]">
+            <span class="font-display font-600 text-ink tabular-nums" id="now-elapsed">0:00</span>
+            <span class="text-inkMute">/</span>
+            <span class="font-display font-600 text-inkSoft tabular-nums" id="now-total">0:00</span>
+          </div>
+        </div>
+        <div class="flex-1 min-h-0 relative">
+          <svg id="scope" viewBox="0 0 800 300" preserveAspectRatio="none" class="w-full h-full block">
+            <g id="scope-grid"></g>
+            <g id="scope-notes"></g>
+            <g id="playhead" style="opacity:0">
+              <line class="playhead-line" x1="0" y1="0" x2="0" y2="300"></line>
+              <circle class="playhead-head" cx="0" cy="6" r="5"></circle>
+            </g>
+            <g id="scope-idle">
+              <text x="400" y="150" text-anchor="middle" fill="#cdc28e" font-family="Fredoka" font-weight="500" font-size="18">✨ roll appears when a song is loaded ✨</text>
+            </g>
+          </svg>
+        </div>
+        <div class="flex-none progress-track">
+          <div id="progress-fill" class="progress-fill" style="width:0%"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT: Upload + Library -->
+    <section class="col-span-12 lg:col-span-4 flex flex-col gap-5 min-h-0">
+      <!-- Upload -->
+      <label id="drop" class="drop p-5 flex-none block">
+        <input id="file-input" type="file" accept=".mid,.midi" multiple class="hidden">
+        <div class="flex items-center gap-4">
+          <div class="text-4xl">📥</div>
+          <div class="flex-1 min-w-0">
+            <div class="song-title text-[22px] leading-tight">drop midi files here</div>
+            <div id="drop-sub" class="text-inkSoft text-[13px] mt-0.5">or click to browse · .mid / .midi</div>
+          </div>
+          <span class="chip chip-sun">convert</span>
+        </div>
+      </label>
+
+      <!-- Library -->
+      <div class="panel flex-1 flex flex-col min-h-0 overflow-hidden">
+        <div class="flex items-center gap-2 px-5 pt-4 pb-2 flex-none">
+          <span class="text-xl">📚</span>
+          <span class="song-title text-[20px]">library</span>
+          <span class="flex-1"></span>
+          <span id="count-display" class="chip chip-ink">0 songs</span>
+        </div>
+        <div class="px-5 pb-3 flex-none">
+          <div class="search-wrap">
+            <span class="search-icon">🔍</span>
+            <input id="search-input" type="text" placeholder="search songs…" autocomplete="off" spellcheck="false">
+            <button id="search-clear" title="clear" aria-label="clear">×</button>
+          </div>
+        </div>
+        <div id="library" class="lib-body flex-1 overflow-y-auto px-5 pb-5 space-y-3"></div>
+        <div id="empty" class="hidden px-5 pb-5 text-center">
+          <div class="text-5xl mb-2">🍃</div>
+          <div class="font-display font-600 text-[18px] text-inkSoft">no songs yet</div>
+          <div class="text-inkMute text-[13px] mt-1">drop a midi up there to get started</div>
+        </div>
+        <div id="no-results" class="hidden px-5 pb-5 text-center">
+          <div class="text-4xl mb-2">🌾</div>
+          <div class="font-display font-600 text-[16px] text-inkSoft">no matches</div>
+          <div class="text-inkMute text-[13px] mt-1">try a different search</div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="toast" class="toast hidden"><div class="toast-inner"></div></div>
+
+<!-- ====================== CARD TEMPLATE ====================== -->
+<template id="card-tpl">
+  <article class="card enter">
+    <div class="flex items-center gap-3">
+      <span class="dot on-leaf" data-led></span>
+      <h3 data-name class="song-title text-[16px] leading-tight truncate flex-1"></h3>
+      <span data-duration-badge class="chip chip-sun tabular-nums">0:00</span>
+    </div>
+
+    <!-- mini roll -->
+    <div class="mt-2.5 rounded-xl bg-[#fbf5e0] border border-[#f0e3b8] relative overflow-hidden">
+      <svg data-roll viewBox="0 0 400 60" preserveAspectRatio="none" class="w-full h-[54px] block"></svg>
+    </div>
+
+    <!-- counts + actions -->
+    <div class="mt-3 flex items-center gap-2">
+      <span class="chip chip-leaf tabular-nums">♪ <span data-count-1>0</span></span>
+      <span class="chip chip-peach tabular-nums">♪ <span data-count-2>0</span></span>
+      <span class="chip chip-sky tabular-nums">♪ <span data-count-3>0</span></span>
+      <span class="chip chip-plum tabular-nums">♪ <span data-count-4>0</span></span>
+      <span class="chip chip-ink tabular-nums" title="progmem"><span data-bytes>—</span></span>
+      <span class="flex-1"></span>
+    </div>
+
+    <div class="mt-3 flex items-center gap-2">
+      <button data-action-flash class="btn btn-leaf" type="button">▶ flash &amp; play</button>
+      <a data-action-midi class="btn btn-ghost" href="#" title="download midi">.mid</a>
+      <span class="flex-1"></span>
+      <button data-action-delete class="btn btn-ghost" type="button" title="delete" style="padding:10px 14px">🗑</button>
+    </div>
+
+    <div data-error class="mt-2 hidden text-[12px] text-roseDeep font-600"></div>
+  </article>
+</template>
+
+<script>
+  // ============================================================
+  // Utils
+  // ============================================================
+  const NOTE_NAMES = ['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'];
+  function hzToMidi(hz){ if(!hz||hz<=0) return null; return 69 + 12 * Math.log2(hz/440); }
+  function hzToNoteName(hz){
+    const m = hzToMidi(hz); if(m===null) return '—';
+    const midi = Math.round(m);
+    const name = NOTE_NAMES[((midi%12)+12)%12];
+    const oct  = Math.floor(midi/12) - 1;
+    return `${name}${oct}`;
+  }
+  function fmtDuration(sec){
+    if(sec==null) return '—';
+    const s = Math.round(sec), m = Math.floor(s/60), r = s%60;
+    return `${m}:${String(r).padStart(2,'0')}`;
+  }
+  function fmtMsClock(ms){
+    const t = Math.max(0,ms)/1000;
+    const m = Math.floor(t/60);
+    const s = t - m*60;
+    return `${m}:${s.toFixed(1).padStart(4,'0')}`;
+  }
+  function fmtBytes(n){ if(!n&&n!==0) return '—'; if(n<1024) return `${n}B`; return `${(n/1024).toFixed(1)}K`; }
+
+  // Normalize a filename into a readable title. Only splits at LOGICAL
+  // section breaks (" - ", " – ", "---", "___"); otherwise joins words with
+  // spaces. Examples:
+  //   "Undertale - Megalovania.mid"     -> "Undertale - Megalovania"
+  //   "wii_channels - mii_channel.mid"  -> "Wii Channels - Mii Channel"
+  //   "seven_nation_army.mid"           -> "Seven Nation Army"
+  //   "01 - Hyrule-Field.mid"           -> "Hyrule Field"
+  function titleCaseWord(w){
+    if(/^[A-Z0-9]{2,5}$/.test(w)) return w;   // OP1, HDR, II
+    if(/^\d+$/.test(w)) return w;
+    return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+  }
+  function normalizeSection(sec){
+    let t = sec.replace(/^[\s\d._]+/, '');     // drop leading numbering
+    t = t.replace(/[._\-]+/g, ' ');            // remaining seps → space
+    t = t.replace(/([a-z])([A-Z])/g, '$1 $2'); // camelCase
+    t = t.replace(/\s+/g, ' ').trim();
+    return t.split(' ').filter(Boolean).map(titleCaseWord).join(' ');
+  }
+  function prettyName(raw){
+    if(!raw) return '';
+    let s = String(raw).replace(/\.midi?$/i, '');
+    s = s.replace(/[-_]{3,}/g, ' - ');         // "---" / "___" -> explicit section break
+    const sections = s.split(/\s+[-–—]\s+/);   // split only on spaced dashes
+    // drop a leading purely-numeric section ("01 - Song" -> "Song")
+    if(sections.length > 1 && /^\s*\d+\s*$/.test(sections[0])) sections.shift();
+    const out = sections.map(normalizeSection).filter(Boolean);
+    return out.length ? out.join(' - ') : String(raw);
+  }
+
+  const VPAL = {
+    1: { fill:'#84cf7f', mist:'#daf2d5', deep:'#4fa353' },
+    2: { fill:'#ffae89', mist:'#ffe1d1', deep:'#e47b5a' },
+    3: { fill:'#9dd5ec', mist:'#d8eef8', deep:'#3f95bd' },
+    4: { fill:'#bd9ae4', mist:'#e8dbf5', deep:'#8e6fc5' },
+  };
+
+  // ============================================================
+  // Clock
+  // ============================================================
+  function tick(){ const e=document.getElementById('clock'); if(!e) return; e.innerHTML = '🕒 ' + new Date().toTimeString().slice(0,5); }
+  tick(); setInterval(tick, 30000);
+
+  // ============================================================
+  // Toast
+  // ============================================================
+  function toast(msg, kind='info', ms=2800){
+    const host = document.getElementById('toast');
+    const inner = host.firstElementChild;
+    const color = kind==='error' ? '#e85e7c' : kind==='ok' ? '#4fa353' : '#e2a72b';
+    const icon  = kind==='error' ? '💔' : kind==='ok' ? '✅' : '🌿';
+    const label = kind==='error' ? 'oops' : kind==='ok' ? 'done' : 'working';
+    inner.innerHTML = `
+      <div class="flex items-center gap-3">
+        <div class="text-2xl">${icon}</div>
+        <div class="flex-1">
+          <div class="font-display font-600 text-[13px] uppercase tracking-wide" style="color:${color}">${label}</div>
+          <div class="text-[14px] text-ink font-600">${msg}</div>
+        </div>
+      </div>`;
+    host.classList.remove('hidden');
+    clearTimeout(host._t);
+    host._t = setTimeout(()=>host.classList.add('hidden'), ms);
+  }
+
+  // ============================================================
+  // Mini roll in library cards
+  // ============================================================
+  function renderMiniRoll(svg, voices, totalMs){
+    const W=400, H=60;
+    if(!totalMs||totalMs<1) totalMs=1;
+    const allMidi=[];
+    for(const v of [1,2,3,4]) for(const n of (voices[`voice${v}`]||[])){
+      const m = hzToMidi(n.f); if(m!==null) allMidi.push(m);
+    }
+    let minM=48, maxM=84;
+    if(allMidi.length){
+      minM = Math.min(...allMidi); maxM = Math.max(...allMidi);
+      if(maxM-minM < 12){ const mid=(minM+maxM)/2; minM=mid-6; maxM=mid+6; }
+      minM-=2; maxM+=2;
+    }
+    const range = Math.max(1, maxM-minM);
+
+    let g = '';
+    // octave grid lines
+    const lowC = Math.ceil(minM/12)*12;
+    for(let m=lowC; m<=maxM; m+=12){
+      const y = H - ((m-minM)/range)*H;
+      g += `<line class="grid-line" x1="0" x2="${W}" y1="${y}" y2="${y}"/>`;
+    }
+    // notes
+    for(const v of [1,2,3,4]){
+      const notes = voices[`voice${v}`] || [];
+      const c = VPAL[v].fill;
+      let t=0;
+      for(const n of notes){
+        const x = (t/totalMs)*W;
+        const w = Math.max(1,(n.d/totalMs)*W);
+        t += n.d;
+        if(!n.f||n.f<=0) continue;
+        const m = hzToMidi(n.f); if(m===null) continue;
+        const y = H - ((m-minM)/range)*H - 1.5;
+        g += `<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${w.toFixed(2)}" height="3" rx="1.5" fill="${c}" opacity="0.9"/>`;
+      }
+    }
+    svg.innerHTML = g;
+  }
+
+  // ============================================================
+  // Library rendering
+  // ============================================================
+  const libraryEl = document.getElementById('library');
+  const emptyEl   = document.getElementById('empty');
+  const countEl   = document.getElementById('count-display');
+  const tpl       = document.getElementById('card-tpl');
+  const notesCache = new Map();
+
+  async function fetchNotes(stem){
+    if(notesCache.has(stem)) return notesCache.get(stem);
+    const r = await fetch(`/api/songs/${stem}/notes`);
+    if(!r.ok) throw new Error('notes fetch failed');
+    const d = await r.json();
+    notesCache.set(stem, d);
+    return d;
+  }
+
+  function renderCard(entry){
+    const node = tpl.content.firstElementChild.cloneNode(true);
+    node.dataset.stem = entry.stem;
+    const displayName = prettyName(entry.filename || entry.stem);
+    // Search index tolerant to separators
+    node.dataset.search = (displayName + ' ' + displayName.replace(/[-·–—]/g,' ')).toLowerCase();
+    node.querySelector('[data-name]').textContent = displayName;
+    node.querySelector('[data-count-1]').textContent = entry.voice1_events ?? '0';
+    node.querySelector('[data-count-2]').textContent = entry.voice2_events ?? '0';
+    node.querySelector('[data-count-3]').textContent = entry.voice3_events ?? '0';
+    node.querySelector('[data-count-4]').textContent = entry.voice4_events ?? '0';
+    node.querySelector('[data-duration-badge]').textContent = fmtDuration(entry.duration_s);
+    node.querySelector('[data-bytes]').textContent = fmtBytes(entry.bytes_progmem);
+
+    const led = node.querySelector('[data-led]');
+    const errEl = node.querySelector('[data-error]');
+    if(entry.success === false){
+      led.classList.remove('on-leaf');
+      led.style.background = '#ff8da3';
+      if(entry.error){ errEl.textContent = entry.error; errEl.classList.remove('hidden'); }
+    }
+
+    node.querySelector('[data-action-midi]').href = `/api/songs/${entry.stem}/midi`;
+
+    const flashBtn = node.querySelector('[data-action-flash]');
+    if(entry.success === false) flashBtn.setAttribute('disabled','');
+    flashBtn.addEventListener('click', () => onFlash(entry));
+
+    node.querySelector('[data-action-delete]').addEventListener('click', async () => {
+      if(!confirm(`delete "${displayName}"?`)) return;
+      const r = await fetch(`/api/songs/${entry.stem}`, {method:'DELETE'});
+      if(r.ok){ toast(`deleted: ${displayName}`, 'ok'); notesCache.delete(entry.stem); await refreshLibrary(); }
+      else toast('delete failed', 'error');
+    });
+
+    if(entry.success !== false){
+      fetchNotes(entry.stem).then(data => {
+        const svg = node.querySelector('[data-roll]');
+        renderMiniRoll(svg, data, data.total_ms);
+      }).catch(()=>{});
+    }
+    return node;
+  }
+
+  async function refreshLibrary(){
+    const r = await fetch('/api/library');
+    const entries = await r.json();
+    libraryEl.innerHTML = '';
+    countEl.textContent = entries.length === 1 ? '1 song' : `${entries.length} songs`;
+    if(entries.length === 0){ emptyEl.classList.remove('hidden'); return; }
+    emptyEl.classList.add('hidden');
+    let d = 40;
+    for(const e of entries){
+      const c = renderCard(e);
+      c.style.animationDelay = `${d}ms`;
+      d += 45;
+      libraryEl.appendChild(c);
+    }
+  }
+
+  // ============================================================
+  // Now playing + simulator
+  // ============================================================
+  const nowTitle   = document.getElementById('now-title');
+  const nowSub     = document.getElementById('now-sub');
+  const nowElapsed = document.getElementById('now-elapsed');
+  const nowTotal   = document.getElementById('now-total');
+  const stopBtn    = document.getElementById('stop-btn');
+  const progressFill = document.getElementById('progress-fill');
+  const scope      = document.getElementById('scope');
+  const scopeGrid  = document.getElementById('scope-grid');
+  const scopeNotes = document.getElementById('scope-notes');
+  const scopeIdle  = document.getElementById('scope-idle');
+  const playhead   = document.getElementById('playhead');
+
+  const SCOPE_W = 800, SCOPE_H = 300;
+  // Sync-Offset: backdate sim t0 so the UI catches up to the Arduino.
+  // Tunable via the "sync" chip in the scope header. Persisted in localStorage.
+  let SIM_OFFSET_MS = parseInt(localStorage.getItem('stepper-sync-ms') || '1000', 10);
+  let sim = null;
+  // Scope view state — controls visible time window for zoom/pan
+  let view = null; // { t0Ms, t1Ms, totalMs, mMin, mMax, notes }
+
+  function setVoiceReadout(v, note){
+    const hz = note && note.f > 0 ? note.f : 0;
+    const name = hz > 0 ? hzToNoteName(hz) : '—';
+    document.querySelector(`[data-voice-note="${v}"]`).textContent = name;
+    document.querySelector(`[data-voice-hz="${v}"]`).textContent = `${hz.toFixed(1)} hz`;
+    const dot = document.querySelector(`[data-voice-dot="${v}"]`);
+    const klass = v===1?'on-leaf': v===2?'on-peach': v===3?'on-sky':'on-plum';
+    dot.classList.remove('on-leaf','on-peach','on-sky','on-plum','pulse');
+    if(hz > 0){ dot.classList.add(klass, 'pulse'); }
+  }
+
+  function clearScope(){
+    scopeGrid.innerHTML=''; scopeNotes.innerHTML='';
+    playhead.style.opacity='0';
+    scopeIdle.style.display='';
+    progressFill.style.width='0%';
+    nowElapsed.textContent='0:00'; nowTotal.textContent='0:00';
+    for(const v of [1,2,3,4]) setVoiceReadout(v, null);
+    view = null;
+  }
+
+  function timeToX(t){
+    const span = view.t1Ms - view.t0Ms;
+    return ((t - view.t0Ms) / span) * SCOPE_W;
+  }
+  function midiToY(m){
+    const range = Math.max(1, view.mMax - view.mMin);
+    return SCOPE_H - ((m - view.mMin) / range) * SCOPE_H;
+  }
+
+  function redrawScope(){
+    if(!view) return;
+    const span = view.t1Ms - view.t0Ms;
+    let grid = '';
+
+    // horizontal octave lines (stronger, with C-label chip)
+    const lowC = Math.ceil(view.mMin/12)*12;
+    for(let m=lowC; m<=view.mMax; m+=12){
+      const y = midiToY(m);
+      grid += `<line class="grid-line-strong" x1="0" x2="${SCOPE_W}" y1="${y}" y2="${y}"/>`;
+      const oct = Math.floor(m/12) - 1;
+      grid += `<text x="6" y="${y-4}" class="tick-text">C${oct}</text>`;
+    }
+
+    // adaptive vertical time ticks
+    const visSec = span / 1000;
+    let step;
+    if(visSec <= 2)       step = 0.25;
+    else if(visSec <= 5)  step = 0.5;
+    else if(visSec <= 12) step = 1;
+    else if(visSec <= 30) step = 2;
+    else if(visSec <= 90) step = 5;
+    else                  step = 10;
+    const sStart = Math.floor((view.t0Ms/1000) / step) * step;
+    const sEnd   = (view.t1Ms/1000) + step;
+    for(let s=sStart; s<=sEnd; s+=step){
+      const tMs = s*1000;
+      if(tMs < view.t0Ms - 1 || tMs > view.t1Ms + 1) continue;
+      const x = timeToX(tMs);
+      const strong = Math.abs(s - Math.round(s)) < 1e-6 && s % (step >= 1 ? step : 1) === 0;
+      grid += `<line class="${strong?'grid-line-strong':'grid-line'}" x1="${x}" x2="${x}" y1="0" y2="${SCOPE_H}" opacity="${strong?0.9:0.55}"/>`;
+      const label = step < 1 ? s.toFixed(step < 0.5 ? 2 : 1) : String(s);
+      grid += `<text x="${x+5}" y="${SCOPE_H-5}" class="tick-text">${label}s</text>`;
+    }
+    scopeGrid.innerHTML = grid;
+
+    // notes — chunkier, softer borders, darker stroke for pop
+    const NOTE_H = 11;
+    let out = '';
+    for(const [vi, vs] of view.notes.entries()){
+      const v = vi+1;
+      const c = VPAL[v].fill;
+      const cDeep = VPAL[v].deep;
+      let t = 0;
+      for(let i=0; i<vs.length; i++){
+        const n = vs[i];
+        const tStart = t, tEnd = t + n.d;
+        t = tEnd;
+        if(!n.f || n.f <= 0) continue;
+        if(tEnd < view.t0Ms || tStart > view.t1Ms) continue;
+        const m = hzToMidi(n.f); if(m === null) continue;
+        const x  = timeToX(tStart);
+        const x2 = timeToX(tEnd);
+        const w  = Math.max(3, x2 - x);
+        const y  = midiToY(m) - NOTE_H/2;
+        out += `<rect class="roll-note" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${w.toFixed(2)}" height="${NOTE_H}" rx="4" fill="${c}" stroke="${cDeep}" stroke-width="1" stroke-opacity="0.4" data-v="${v}" data-i="${i}"/>`;
+      }
+    }
+    scopeNotes.innerHTML = out;
+  }
+
+  function drawScope(notes){
+    const voices = [notes.voice1, notes.voice2, notes.voice3, notes.voice4 || []];
+    const totalMs = Math.max(1, notes.total_ms);
+    const allMidi = [];
+    for(const vs of voices) for(const n of vs){ const m=hzToMidi(n.f); if(m!==null) allMidi.push(m); }
+    let minM=40, maxM=90;
+    if(allMidi.length){
+      minM = Math.min(...allMidi); maxM = Math.max(...allMidi);
+      if(maxM - minM < 18){ const mid=(minM+maxM)/2; minM=mid-9; maxM=mid+9; }
+      minM -= 2; maxM += 2;
+    }
+    view = {
+      t0Ms: 0, t1Ms: totalMs, totalMs,
+      mMin: minM, mMax: maxM,
+      notes: voices,
+    };
+    redrawScope();
+    scopeIdle.style.display = 'none';
+    return { totalMs };
+  }
+
+  function stopSimulation(){
+    if(sim){ cancelAnimationFrame(sim.raf); sim = null; }
+    playhead.style.opacity='0';
+    for(const n of scopeNotes.querySelectorAll('.roll-note.active')) n.classList.remove('active');
+    for(const v of [1,2,3,4]) setVoiceReadout(v, null);
+    document.querySelectorAll('.card.playing').forEach(c => c.classList.remove('playing'));
+    stopBtn.setAttribute('disabled','');
+  }
+
+  function startSimulation(entry, notes){
+    stopSimulation();
+    clearScope();
+    const { totalMs } = drawScope(notes);
+
+    const v4len = (notes.voice4 || []).length;
+    nowTitle.textContent = prettyName(entry.filename || entry.stem);
+    nowSub.innerHTML = `<span class="chip chip-leaf tabular-nums">mel ${notes.voice1.length}</span>
+                       <span class="chip chip-peach tabular-nums">bass ${notes.voice2.length}</span>
+                       <span class="chip chip-sky tabular-nums">harm↑ ${notes.voice3.length}</span>
+                       <span class="chip chip-plum tabular-nums">harm↓ ${v4len}</span>`;
+    nowTotal.textContent = fmtMsClock(totalMs);
+    stopBtn.removeAttribute('disabled');
+
+    const card = document.querySelector(`.card[data-stem="${entry.stem}"]`);
+    if(card) card.classList.add('playing');
+
+    const pointers = [0,0,0,0], times = [0,0,0,0];
+    const arr = [notes.voice1, notes.voice2, notes.voice3, notes.voice4 || []];
+    const t0 = performance.now() - SIM_OFFSET_MS;
+    sim = { raf: 0 };
+
+    const tick = () => {
+      const now = performance.now() - t0;
+      nowElapsed.textContent = fmtMsClock(now);
+      const clamped = Math.min(now, totalMs);
+      const px = view ? timeToX(clamped) : (clamped/totalMs)*SCOPE_W;
+      playhead.setAttribute('transform', `translate(${px},0)`);
+      playhead.style.opacity = (px >= 0 && px <= SCOPE_W) ? '1' : '0';
+      progressFill.style.width = `${Math.min(100, (now/totalMs)*100)}%`;
+
+      for(let v=0; v<4; v++){
+        while(pointers[v] < arr[v].length && times[v] + arr[v][pointers[v]].d <= now){
+          times[v] += arr[v][pointers[v]].d; pointers[v]++;
+        }
+        const note = arr[v][pointers[v]];
+        setVoiceReadout(v+1, note || null);
+        const sel = scopeNotes.querySelectorAll(`[data-v="${v+1}"]`);
+        for(const el of sel){
+          const i = parseInt(el.dataset.i, 10);
+          if(i === pointers[v]) el.classList.add('active');
+          else if(el.classList.contains('active')) el.classList.remove('active');
+        }
+      }
+
+      if(now >= totalMs){
+        for(const n of scopeNotes.querySelectorAll('.roll-note.active')) n.classList.remove('active');
+        for(const v of [1,2,3,4]) setVoiceReadout(v, null);
+        if(card) card.classList.remove('playing');
+        stopBtn.setAttribute('disabled','');
+        nowSub.innerHTML = `<span class="chip chip-leaf">🌿 playback complete</span>`;
+        sim = null;
+        return;
+      }
+      sim.raf = requestAnimationFrame(tick);
+    };
+    sim.raf = requestAnimationFrame(tick);
+  }
+
+  // ============================================================
+  // Flash / stop
+  // ============================================================
+  async function onFlash(entry){
+    const card = document.querySelector(`.card[data-stem="${entry.stem}"]`);
+    const btn = card?.querySelector('[data-action-flash]');
+    if(btn?.hasAttribute('disabled')) return;
+    btn?.setAttribute('disabled','');
+    const orig = btn?.textContent;
+    if(btn) btn.textContent = 'uploading…';
+    const niceName = prettyName(entry.filename || entry.stem);
+    toast(`flashing ${niceName}`, 'info', 4000);
+
+    try {
+      const useSync = ledSyncEnabled && ledBridge.reachable && ledBridge.connected;
+      const [flashRes, notes] = await Promise.all([
+        fetch(`/api/songs/${entry.stem}/flash`, {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({sync: useSync, sync_offset_ms: ledSyncOffsetMs, sync_renderer: ledSyncRenderer}),
+        }).then(r => r.json().then(d => ({ok:r.ok, ...d}))),
+        fetchNotes(entry.stem),
+      ]);
+      if(!flashRes.ok || !flashRes.success){
+        console.error('[flash]', flashRes.log || flashRes.detail);
+        toast(`flash failed${flashRes.stage?` (${flashRes.stage})`:''}`, 'error', 5000);
+        return;
+      }
+      toast(`flashed: ${niceName}`, 'ok', 2500);
+      startSimulation(entry, notes);
+    } catch(err){
+      console.error('[flash]', err);
+      toast(`flash error: ${err.message}`, 'error', 5000);
+    } finally {
+      if(btn){ btn.textContent = orig; btn.removeAttribute('disabled'); }
+    }
+  }
+
+  stopBtn.addEventListener('click', async () => {
+    if(stopBtn.hasAttribute('disabled')) return;
+    stopBtn.setAttribute('disabled','');
+    toast('stopping — uploading silence', 'info', 4000);
+    try {
+      const r = await fetch('/api/stop', {method:'POST'});
+      const d = await r.json();
+      if(r.ok && d.success) toast('stopped', 'ok', 2200);
+      else { console.error('[stop]', d.log || d.detail); toast('stop failed', 'error', 5000); }
+    } catch(err){
+      console.error('[stop]', err);
+      toast(`stop error: ${err.message}`, 'error', 5000);
+    } finally {
+      stopSimulation();
+    }
+  });
+
+  // ── LED Sync toggle (reactive to bridge status) ──────────────────────
+  const ledSyncBtn     = document.getElementById('led-sync-btn');
+  const ledSyncDots    = document.getElementById('led-sync-dots');
+  const ledSyncEmoji   = document.getElementById('led-sync-emoji');
+  const ledSyncLabel   = document.getElementById('led-sync-label');
+  const ledSyncSuffix  = document.getElementById('led-sync-suffix');
+  const ledOffsetChip  = document.getElementById('led-offset-chip');
+  const ledOffsetVal   = document.getElementById('led-offset-val');
+  let ledSyncEnabled   = localStorage.getItem('stepper-led-sync') === '1';
+  let ledSyncOffsetMs  = parseInt(localStorage.getItem('stepper-led-offset-ms') ?? '0', 10);
+  let ledSyncRenderer  = localStorage.getItem('stepper-led-renderer2') ?? 'pulsewall';
+  let ledBridge        = { reachable: false, connected: false, port: null };
+  const ledRendererChip = document.getElementById('led-renderer-chip');
+  const ledRendererVal  = document.getElementById('led-renderer-val');
+  ledRendererVal.textContent = ledSyncRenderer;
+  const RENDERER_CYCLE = ['pulsewall', 'wave', 'reactive'];
+  ledRendererChip.addEventListener('click', () => {
+    const i = RENDERER_CYCLE.indexOf(ledSyncRenderer);
+    ledSyncRenderer = RENDERER_CYCLE[(i + 1) % RENDERER_CYCLE.length];
+    localStorage.setItem('stepper-led-renderer2', ledSyncRenderer);
+    ledRendererVal.textContent = ledSyncRenderer;
+    toast(`render style: ${ledSyncRenderer}`, 'info', 1800);
+  });
+  function renderOffset(){
+    const sign = ledSyncOffsetMs > 0 ? '+' : (ledSyncOffsetMs < 0 ? '−' : '');
+    ledOffsetVal.textContent = sign + Math.abs(ledSyncOffsetMs);
+  }
+  renderOffset();
+
+  function ledChipState(){
+    if (!ledBridge.reachable) return 'offline';
+    if (!ledBridge.connected) return 'no-device';
+    return ledSyncEnabled ? 'active' : 'ready';
+  }
+
+  function applyLedSyncUi(){
+    const state = ledChipState();
+    ledSyncBtn.classList.remove('chip-leaf', 'chip-ink', 'chip-peach');
+    ledSyncDots.style.display   = 'none';
+    ledSyncSuffix.style.display = 'none';
+    ledSyncSuffix.textContent   = '';
+    if (state === 'offline'){
+      ledSyncBtn.classList.add('chip-ink');
+      ledSyncBtn.style.opacity = '0.55';
+      ledSyncEmoji.textContent = '💤';
+      ledSyncSuffix.textContent = '· bridge off';
+      ledSyncSuffix.style.display = 'inline';
+      ledSyncBtn.title = 'PC LED bridge unreachable — is the PC on? led-panel-bridge.service running?';
+    } else if (state === 'no-device'){
+      ledSyncBtn.classList.add('chip-ink');
+      ledSyncBtn.style.opacity = '0.7';
+      ledSyncEmoji.textContent = '⚠️';
+      ledSyncSuffix.textContent = '· no panels';
+      ledSyncSuffix.style.display = 'inline';
+      ledSyncBtn.title = 'LED bridge running but D1 mini not detected — re-plug USB or press RST';
+    } else if (state === 'ready'){
+      ledSyncBtn.classList.add('chip-ink');
+      ledSyncBtn.style.opacity = '1';
+      ledSyncEmoji.textContent = '💡';
+      ledSyncBtn.title = 'click to enable: each LED panel mirrors a stepper voice on next flash';
+    } else { // active
+      ledSyncBtn.classList.add('chip-leaf');
+      ledSyncBtn.style.opacity = '1';
+      ledSyncEmoji.textContent = '✨';
+      ledSyncDots.style.display = 'inline-flex';
+      ledSyncBtn.title = 'LED sync ON — click to disable';
+    }
+    ledOffsetChip.style.display    = (state === 'active') ? 'inline-flex' : 'none';
+    ledRendererChip.style.display  = (state === 'active') ? 'inline-flex' : 'none';
+  }
+
+  function setOffset(delta){
+    ledSyncOffsetMs = Math.max(-3000, Math.min(3000, ledSyncOffsetMs + delta));
+    localStorage.setItem('stepper-led-offset-ms', String(ledSyncOffsetMs));
+    renderOffset();
+  }
+  // shift-click for ±500ms steps
+  document.getElementById('led-offset-minus').addEventListener('click', e => setOffset(e.shiftKey ? -500 : -100));
+  document.getElementById('led-offset-plus' ).addEventListener('click', e => setOffset(e.shiftKey ? +500 : +100));
+
+  async function pollLedBridge(){
+    try {
+      const r = await fetch('/api/led-bridge/status');
+      ledBridge = await r.json();
+    } catch {
+      ledBridge = { reachable: false, connected: false, port: null };
+    }
+    applyLedSyncUi();
+  }
+
+  ledSyncBtn.addEventListener('click', async () => {
+    const state = ledChipState();
+    if (state === 'offline'){
+      toast('LED bridge offline — sync unavailable', 'error', 3500);
+      pollLedBridge();
+      return;
+    }
+    if (state === 'no-device'){
+      toast('No D1 mini on the LED bridge — re-plug USB or press RST', 'error', 4500);
+      pollLedBridge();
+      return;
+    }
+    ledSyncEnabled = !ledSyncEnabled;
+    localStorage.setItem('stepper-led-sync', ledSyncEnabled ? '1' : '0');
+    applyLedSyncUi();
+    toast(ledSyncEnabled ? 'LED sync on — flash a song to see it' : 'LED sync off',
+          ledSyncEnabled ? 'ok' : 'info', 2200);
+  });
+
+  applyLedSyncUi();
+  pollLedBridge();
+  setInterval(pollLedBridge, 5000);
+
+  // ── Effect picker ────────────────────────────────────────────────────
+  const effectBtn   = document.getElementById('effect-btn');
+  const effectLabel = document.getElementById('effect-label');
+  const effectEmoji = document.getElementById('effect-emoji');
+  let effectsList = [];
+  let currentEffect = null;
+  let syncActive = false;
+
+  async function loadEffects(){
+    try {
+      const r = await fetch('/api/effects/list');
+      effectsList = await r.json();
+    } catch {}
+  }
+  function renderEffect(){
+    const cur = effectsList.find(e => e.name === currentEffect);
+    effectLabel.textContent = 'effect: ' + (cur ? cur.label.toLowerCase() : 'off');
+    effectEmoji.textContent = currentEffect ? '🎞️' : '🎬';
+    effectBtn.style.opacity = syncActive ? '0.45' : '1';
+    effectBtn.title = syncActive
+      ? 'song sync is running — effects are paused'
+      : 'cycle through LED effects (shift+click to turn off)';
+  }
+  async function pollEffectStatus(){
+    try {
+      const [eRes, sRes] = await Promise.all([
+        fetch('/api/effects/status'),
+        fetch('/api/sync/status'),
+      ]);
+      const eState = await eRes.json();
+      const sState = await sRes.json();
+      currentEffect = eState.active ? eState.name : null;
+      syncActive = sState.active;
+      renderEffect();
+    } catch {}
+  }
+  async function cycleEffect(){
+    if (!effectsList.length) await loadEffects();
+    if (!effectsList.length) return;
+    if (syncActive){
+      toast('song sync is running — effects are paused', 'info', 2500);
+      return;
+    }
+    const idx = effectsList.findIndex(e => e.name === currentEffect);
+    if (idx === effectsList.length - 1){
+      await fetch('/api/effects/stop', {method:'POST'});
+      currentEffect = null;
+    } else {
+      const next = effectsList[idx + 1];
+      const r = await fetch('/api/effects/start', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({name: next.name}),
+      });
+      if (r.ok){
+        currentEffect = next.name;
+        toast(`effect: ${next.label}`, 'ok', 1800);
+      } else {
+        const err = await r.json().catch(() => ({}));
+        toast(`effect failed: ${err.detail || r.status}`, 'error', 3000);
+      }
+    }
+    renderEffect();
+  }
+  effectBtn.addEventListener('click', async (e) => {
+    if (e.shiftKey){
+      await fetch('/api/effects/stop', {method:'POST'});
+      currentEffect = null;
+      renderEffect();
+      toast('effects off', 'info', 1500);
+      return;
+    }
+    cycleEffect();
+  });
+  loadEffects().then(pollEffectStatus);
+  setInterval(pollEffectStatus, 5000);
+
+  const motorTestBtn = document.getElementById('motor-test-btn');
+  motorTestBtn.addEventListener('click', async () => {
+    if(motorTestBtn.hasAttribute('disabled')) return;
+    motorTestBtn.setAttribute('disabled','');
+    const orig = motorTestBtn.innerHTML;
+    motorTestBtn.innerHTML = '⏳ flashing…';
+    stopSimulation();
+    toast('motor test — flashing sketch', 'info', 4000);
+    try {
+      const r = await fetch('/api/motor-test', {method:'POST'});
+      const d = await r.json();
+      if(r.ok && d.success) toast('motor test running — X → Y → Z', 'ok', 3000);
+      else { console.error('[motor-test]', d.log || d.detail); toast('motor test failed', 'error', 5000); }
+    } catch(err){
+      console.error('[motor-test]', err);
+      toast(`motor test error: ${err.message}`, 'error', 5000);
+    } finally {
+      motorTestBtn.innerHTML = orig;
+      motorTestBtn.removeAttribute('disabled');
+    }
+  });
+
+  // ============================================================
+  // Upload (drag + drop + click)
+  // ============================================================
+  const drop      = document.getElementById('drop');
+  const fileInput = document.getElementById('file-input');
+  const dropSub   = document.getElementById('drop-sub');
+
+  async function uploadOne(file){
+    const fd = new FormData(); fd.append('file', file);
+    const r = await fetch('/api/upload', {method:'POST', body:fd});
+    if(!r.ok) throw new Error(await r.text() || r.statusText);
+    return r.json();
+  }
+  async function uploadFiles(list){
+    const files = Array.from(list).filter(f => /\.midi?$/i.test(f.name));
+    if(!files.length){ toast('no .mid / .midi files', 'error'); return; }
+    const sub = dropSub.textContent;
+    dropSub.textContent = `converting ${files.length} file${files.length>1?'s':''}…`;
+    for(const f of files){
+      const nice = prettyName(f.name);
+      try {
+        const entry = await uploadOne(f);
+        if(entry.success) toast(`compiled: ${nice}`, 'ok');
+        else toast(`${nice}: ${entry.error || 'conversion error'}`, 'error', 5000);
+      } catch(err){
+        toast(`${nice}: ${err.message || 'upload failed'}`, 'error', 5000);
+      }
+      await refreshLibrary();
+    }
+    dropSub.textContent = sub;
+  }
+
+  fileInput.addEventListener('change', e => {
+    if(e.target.files?.length) uploadFiles(e.target.files);
+    e.target.value = '';
+  });
+  ['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('drag'); }));
+  ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('drag'); }));
+  drop.addEventListener('drop', e => {
+    if(e.dataTransfer?.files?.length) uploadFiles(e.dataTransfer.files);
+  });
+
+  // ============================================================
+  // Scope zoom + pan (mouse wheel = zoom time, shift+wheel = pitch,
+  // click-drag = pan, double-click / fit-button / "0" = reset)
+  // ============================================================
+  function zoomTime(factor, anchorFrac){
+    if(!view) return;
+    const span = view.t1Ms - view.t0Ms;
+    const minSpan = Math.min(300, view.totalMs); // never zoom below 300ms
+    const maxSpan = view.totalMs;
+    const newSpan = Math.max(minSpan, Math.min(maxSpan, span * factor));
+    if(newSpan === span) return;
+    const anchorMs = view.t0Ms + anchorFrac * span;
+    let t0 = anchorMs - anchorFrac * newSpan;
+    let t1 = t0 + newSpan;
+    if(t0 < 0){ t0 = 0; t1 = newSpan; }
+    if(t1 > view.totalMs){ t1 = view.totalMs; t0 = t1 - newSpan; }
+    view.t0Ms = t0; view.t1Ms = t1;
+    redrawScope();
+  }
+  function zoomPitch(factor, anchorFrac){
+    if(!view) return;
+    const range = view.mMax - view.mMin;
+    const newRange = Math.max(6, Math.min(88, range * factor));
+    if(newRange === range) return;
+    const anchorM = view.mMax - anchorFrac * range;
+    let mMax = anchorM + anchorFrac * newRange;
+    let mMin = mMax - newRange;
+    if(mMin < 0){ mMin = 0; mMax = newRange; }
+    if(mMax > 127){ mMax = 127; mMin = 127 - newRange; }
+    view.mMin = mMin; view.mMax = mMax;
+    redrawScope();
+  }
+  function panTime(dxFrac){
+    if(!view) return;
+    const span = view.t1Ms - view.t0Ms;
+    let t0 = view.t0Ms - dxFrac * span;
+    let t1 = t0 + span;
+    if(t0 < 0){ t0 = 0; t1 = span; }
+    if(t1 > view.totalMs){ t1 = view.totalMs; t0 = t1 - span; }
+    view.t0Ms = t0; view.t1Ms = t1;
+    redrawScope();
+  }
+  function fitView(){
+    if(!view) return;
+    const allMidi = [];
+    for(const vs of view.notes) for(const n of vs){ const m = hzToMidi(n.f); if(m!==null) allMidi.push(m); }
+    let minM = 40, maxM = 90;
+    if(allMidi.length){
+      minM = Math.min(...allMidi); maxM = Math.max(...allMidi);
+      if(maxM - minM < 18){ const mid=(minM+maxM)/2; minM=mid-9; maxM=mid+9; }
+      minM -= 2; maxM += 2;
+    }
+    view.t0Ms = 0; view.t1Ms = view.totalMs;
+    view.mMin = minM; view.mMax = maxM;
+    redrawScope();
+  }
+
+  scope.addEventListener('wheel', e => {
+    if(!view) return;
+    e.preventDefault();
+    const rect = scope.getBoundingClientRect();
+    const fx = (e.clientX - rect.left) / rect.width;
+    const fy = (e.clientY - rect.top) / rect.height;
+    const factor = e.deltaY < 0 ? 0.8 : 1.25;
+    if(e.shiftKey) zoomPitch(factor, fy);
+    else zoomTime(factor, fx);
+  }, { passive: false });
+
+  const scopeWrap = scope.closest('.scope-wrap');
+  let dragState = null;
+  scope.addEventListener('mousedown', e => {
+    if(!view) return;
+    e.preventDefault();  // suppress browser's text-selection drag
+    dragState = { x: e.clientX, w: scope.getBoundingClientRect().width };
+    scopeWrap?.classList.add('dragging');
+  });
+  window.addEventListener('mousemove', e => {
+    if(!dragState) return;
+    const dx = e.clientX - dragState.x;
+    dragState.x = e.clientX;
+    panTime(dx / dragState.w);
+  });
+  window.addEventListener('mouseup', () => {
+    if(!dragState) return;
+    dragState = null;
+    scopeWrap?.classList.remove('dragging');
+  });
+  scope.addEventListener('dblclick', fitView);
+  document.getElementById('zoom-reset').addEventListener('click', fitView);
+  window.addEventListener('keydown', e => {
+    if(e.target.tagName === 'INPUT') return;
+    if(e.key === '0') fitView();
+    else if(e.key === '+' || e.key === '=') zoomTime(0.75, 0.5);
+    else if(e.key === '-') zoomTime(1.33, 0.5);
+  });
+
+  // ============================================================
+  // Library search
+  // ============================================================
+  const searchInput = document.getElementById('search-input');
+  const searchClear = document.getElementById('search-clear');
+  const searchWrap  = searchInput.parentElement;
+  const noResults   = document.getElementById('no-results');
+
+  function applySearch(){
+    const q = searchInput.value.trim().toLowerCase();
+    searchWrap.classList.toggle('has-text', q.length > 0);
+    const cards = libraryEl.querySelectorAll('.card');
+    if(cards.length === 0) return;
+    let visible = 0;
+    for(const c of cards){
+      const hit = !q || (c.dataset.search || '').includes(q);
+      c.style.display = hit ? '' : 'none';
+      if(hit) visible++;
+    }
+    noResults.classList.toggle('hidden', visible > 0 || q.length === 0);
+  }
+  searchInput.addEventListener('input', applySearch);
+  searchClear.addEventListener('click', () => { searchInput.value=''; applySearch(); searchInput.focus(); });
+  window.addEventListener('keydown', e => {
+    if(e.key === '/' && e.target.tagName !== 'INPUT') {
+      e.preventDefault(); searchInput.focus(); searchInput.select();
+    }
+    if(e.key === 'Escape' && document.activeElement === searchInput){
+      searchInput.value=''; applySearch(); searchInput.blur();
+    }
+  });
+
+  // ============================================================
+  // Sync offset control
+  // ============================================================
+  const syncVal = document.getElementById('sync-val');
+  function setSync(v){
+    SIM_OFFSET_MS = Math.max(0, Math.min(5000, v));
+    syncVal.textContent = SIM_OFFSET_MS;
+    localStorage.setItem('stepper-sync-ms', String(SIM_OFFSET_MS));
+  }
+  setSync(SIM_OFFSET_MS);
+  document.getElementById('sync-minus').addEventListener('click', () => setSync(SIM_OFFSET_MS - 50));
+  document.getElementById('sync-plus').addEventListener('click',  () => setSync(SIM_OFFSET_MS + 50));
+
+  // Init
+  clearScope();
+  refreshLibrary();
+</script>
+</body>
+</html>
